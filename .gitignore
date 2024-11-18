@@ -1,0 +1,5 @@
+venv/
+.env
+prompt.txt
+top_websites.csv
+__pychache__/
