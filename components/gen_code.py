@@ -23,7 +23,7 @@ def get_code_from_gemini(prompt):
     """Get code generation from Gemini"""
     try:
         # Initialize Gemini model
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        model = genai.GenerativeModel('gemini-1.5-pro-002')
         
         # Add specific instruction to generate only code
         enhanced_prompt = f"""
