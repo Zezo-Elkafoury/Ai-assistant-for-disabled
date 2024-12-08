@@ -1,241 +1,292 @@
-import customtkinter as ctk
-import google.generativeai as genai
-import speech_recognition as sr
-import pyttsx3
-import threading
+import argparse
 import os
-from time import sleep
-from dotenv import load_dotenv
+import shutil
+import webbrowser
+# from pytube import YouTube
+# from fpdf import FPDF
+# import smtplib
+# from email.mime.text import MIMEText
+# from email.mime.multipart import MIMEMultipart
+# from zipfile import ZipFile
+# from PIL import Image
+import subprocess
 
-load_dotenv()
 
-class VoiceChatBot:
-    def __init__(self):
-        self.root = ctk.CTk()
-        self.root.title("AI Voice Assistant")
-        
-        # Window positioning
-        width = 400
-        height = 600
-        x = self.root.winfo_screenwidth() - width - 20
-        self.root.geometry(f"{width}x{height}+{x}+20")
-        
-        self.root.attributes("-topmost", True)
-        ctk.set_appearance_mode("dark")
-        
-        # Initialize voice components
-        self.recognizer = sr.Recognizer()
-        self.setup_tts_engine()
-        self.is_listening = False
-        
-        # Initialize Gemini
-        genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
-        self.model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash-002",
-            system_instruction="""You are a prompt engineer. Help users clarify their requests with follow-up questions. Once refined, write: FINAL PROMPT: followed by the user's refined prompt."""
-        )
-        self.chat = self.model.start_chat(history=[])
-        
-        self.setup_ui()
-        
-    def setup_tts_engine(self):
-        """Initialize text-to-speech engine with error handling"""
-        try:
-            self.engine = pyttsx3.init()
-            # Set properties for better speech
-            self.engine.setProperty('rate', 150)  # Slower rate for clarity
-            voices = self.engine.getProperty('voices')
-            # Try to set a female voice if available
-            for voice in voices:
-                if "female" in voice.name.lower():
-                    self.engine.setProperty('voice', voice.id)
-                    break
-        except Exception as e:
-            print(f"TTS Engine initialization error: {str(e)}")
-            self.engine = None
-    
-    def setup_ui(self):
-        # Colors
-        bg_color = "#1E1E1E"
-        input_bg = "#2D2D2D"
-        accent_color = "#007AFF"
-        
-        # Main container
-        self.main_frame = ctk.CTkFrame(self.root, fg_color=bg_color)
-        self.main_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # Status indicator
-        self.status_label = ctk.CTkLabel(
-            self.main_frame,
-            text="",
-            text_color="#666666",
-            font=("Inter", 11)
-        )
-        self.status_label.pack(fill="x", pady=(0, 5))
-        
-        # Chat area
-        self.messages_area = ctk.CTkTextbox(
-            self.main_frame,
-            wrap="word",
-            font=("Inter", 12),
-            fg_color=input_bg,
-            text_color="white",
-            corner_radius=10
-        )
-        self.messages_area.pack(fill="both", expand=True, pady=(0, 10))
-        self.messages_area.configure(state="disabled")
-        
-        # Input container
-        input_container = ctk.CTkFrame(self.main_frame, fg_color=bg_color)
-        input_container.pack(fill="x", pady=(0, 5))
-        
-        # Input field
-        self.input_field = ctk.CTkTextbox(
-            input_container,
-            height=40,
-            wrap="word",
-            font=("Inter", 12),
-            fg_color=input_bg,
-            text_color="white",
-            corner_radius=10
-        )
-        self.input_field.pack(side="left", fill="both", expand=True, padx=(0, 5))
-        
-        # Microphone button
-        self.mic_button = ctk.CTkButton(
-            input_container,
-            text="🎤",
-            width=40,
-            height=40,
-            command=self.toggle_voice_input,
-            fg_color=input_bg,
-            hover_color="#3D3D3D",
-            corner_radius=10,
-            font=("Inter", 16)
-        )
-        self.mic_button.pack(side="right", padx=(0, 5))
-        
-        # Send button
-        self.send_button = ctk.CTkButton(
-            input_container,
-            text="→",
-            width=40,
-            height=40,
-            command=self.send_message,
-            font=("Inter", 16, "bold"),
-            fg_color=accent_color,
-            hover_color="#0056b3",
-            corner_radius=10
-        )
-        self.send_button.pack(side="right")
-        
-        # Key bindings
-        self.root.bind('<Control-m>', lambda e: self.toggle_voice_input())
-        self.input_field.bind("<Return>", lambda e: self.send_message() if not e.state & 0x1 else None)
-        self.input_field.bind("<Shift-Return>", lambda e: None)
-        
-        # Welcome message
-        self.add_bot_message("How can I help? (Press Ctrl+M for voice input)")
-    
-    def toggle_voice_input(self):
-        if self.is_listening:
-            self.stop_listening()
-        else:
-            self.start_listening()
-    
-    def start_listening(self):
-        self.is_listening = True
-        self.mic_button.configure(fg_color="#007AFF")
-        self.status_label.configure(text="Listening... (Ctrl+M to stop)")
-        threading.Thread(target=self.listen_for_speech, daemon=True).start()
-    
-    def stop_listening(self):
-        self.is_listening = False
-        self.mic_button.configure(fg_color="#2D2D2D")
-        self.status_label.configure(text="")
-    
-    def listen_for_speech(self):
-        with sr.Microphone() as source:
-            self.recognizer.adjust_for_ambient_noise(source, duration=0.5)
-            try:
-                audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=10)
-                text = self.recognizer.recognize_google(audio)
-                self.root.after(0, self.process_voice_input, text)
-            except sr.WaitTimeoutError:
-                self.root.after(0, self.show_error, "No speech detected")
-            except sr.UnknownValueError:
-                self.root.after(0, self.show_error, "Could not understand audio")
-            except Exception as e:
-                self.root.after(0, self.show_error, f"Error: {str(e)}")
-            finally:
-                self.root.after(0, self.stop_listening)
-    
-    def process_voice_input(self, text):
-        self.input_field.delete("1.0", "end")
-        self.input_field.insert("1.0", text)
-        self.send_message()
-    
-    def show_error(self, message):
-        self.status_label.configure(text=message)
-        self.root.after(3000, lambda: self.status_label.configure(text=""))
-    
-    def speak_text(self, text):
-        """Speak text with error handling"""
-        if not self.engine:
-            print("Text-to-speech engine not available")
-            return
+# Define functions for the tasks
 
-        def speak():
-            try:
-                # Clean up the text for speech
-                cleaned_text = text.replace('FINAL PROMPT:', '').strip()
-                self.engine.say(cleaned_text)
-                self.engine.runAndWait()
-            except Exception as e:
-                print(f"TTS Error: {str(e)}")
+def move_files_by_type(src_folder, dest_folder, file_extension):
+    """Moves files of a specific type from source to destination."""
+    try:
+        if not os.path.exists(dest_folder):
+            os.makedirs(dest_folder)
+        for file in os.listdir(src_folder):
+            if file.endswith(file_extension):
+                shutil.move(os.path.join(src_folder, file), os.path.join(dest_folder, file))
+        print(f"Moved all {file_extension} files to {dest_folder}.")
+    except Exception as e:
+        print(f"Error moving files: {str(e)}")
 
-        threading.Thread(target=speak, daemon=True).start()
-    
-    def add_user_message(self, message):
-        self.messages_area.configure(state="normal")
-        self.messages_area.insert("end", "\n\nYou: ", "user_header")
-        self.messages_area.insert("end", f"{message}\n", "user_message")
-        self.messages_area.configure(state="disabled")
-        self.messages_area.see("end")
-    
-    def add_bot_message(self, message):
-        self.messages_area.configure(state="normal")
-        self.messages_area.insert("end", "\n\nAI: ", "bot_header")
-        self.messages_area.insert("end", f"{message}\n", "bot_message")
-        self.messages_area.configure(state="disabled")
-        self.messages_area.see("end")
-        
-        # Speak the response
-        self.speak_text(message)
-    
-    def send_message(self):
-        message = self.input_field.get("1.0", "end-1c").strip()
-        if not message:
-            return
-        
-        self.input_field.delete("1.0", "end")
-        self.add_user_message(message)
-        
-        try:
-            response = self.chat.send_message(message).text
-            self.add_bot_message(response)
-            if "FINAL PROMPT" in response:
-                with open('prompt.txt', 'w+') as f:
-                    f.write(response)
-                sleep(2)
-                os.system("python3 components/gen_code.py")
-        except Exception as e:
-            error_message = f"Error: {str(e)}"
-            self.add_bot_message(error_message)
-            self.speak_text("Sorry, I encountered an error.")
-    
-    def run(self):
-        self.root.mainloop()
+def organize_desktop(desktop_path=os.path.expanduser("~/Desktop")):
+    """Organizes desktop files by type."""
+    try:
+        file_types = {
+            "Documents": [".pdf", ".docx", ".txt"],
+            "Images": [".jpg", ".png", ".gif"],
+            "Videos": [".mp4", ".mkv"],
+            "Archives": [".zip", ".rar"]
+        }
+        for category, extensions in file_types.items():
+            category_path = os.path.join(desktop_path, category)
+            os.makedirs(category_path, exist_ok=True)
+            for file in os.listdir(desktop_path):
+                if any(file.endswith(ext) for ext in extensions):
+                    shutil.move(os.path.join(desktop_path, file), os.path.join(category_path, file))
+        print("Desktop organized successfully.")
+    except Exception as e:
+        print(f"Error organizing desktop: {str(e)}")
 
+def search_google(query):
+    """Searches Google with the given query."""
+    webbrowser.open(f"https://www.google.com/search?q={query}")
+    print(f"Searched Google for: {query}")
+
+def download_youtube_video(url, save_path="."):
+    """Downloads a YouTube video to the specified path."""
+    try:
+        yt = YouTube(url)
+        stream = yt.streams.get_highest_resolution()
+        stream.download(output_path=save_path)
+        print(f"Downloaded video: {yt.title}")
+    except Exception as e:
+        print(f"Error downloading video: {str(e)}")
+
+def batch_rename_files(folder_path, prefix):
+    """Renames all files in a folder with a given prefix."""
+    try:
+        for i, file in enumerate(os.listdir(folder_path)):
+            ext = os.path.splitext(file)[1]
+            new_name = f"{prefix}_{i+1}{ext}"
+            os.rename(os.path.join(folder_path, file), os.path.join(folder_path, new_name))
+        print("Batch rename completed.")
+    except Exception as e:
+        print(f"Error renaming files: {str(e)}")
+
+def zip_folder(folder_path, zip_name):
+    """Creates a ZIP file from a folder."""
+    try:
+        with ZipFile(f"{zip_name}.zip", 'w') as zipf:
+            for root, _, files in os.walk(folder_path):
+                for file in files:
+                    zipf.write(os.path.join(root, file))
+        print(f"Folder {folder_path} zipped successfully as {zip_name}.zip.")
+    except Exception as e:
+        print(f"Error creating ZIP: {str(e)}")
+
+def extract_zip(zip_path, dest_folder):
+    """Extracts a ZIP file."""
+    try:
+        with ZipFile(zip_path, 'r') as zipf:
+            zipf.extractall(dest_folder)
+        print(f"Extracted {zip_path} to {dest_folder}.")
+    except Exception as e:
+        print(f"Error extracting ZIP: {str(e)}")
+
+def convert_to_pdf(files, output_pdf):
+    """Converts files to a PDF."""
+    try:
+        pdf = FPDF()
+        for file in files.split(","):
+            if file.endswith(".txt"):
+                with open(file, "r") as f:
+                    pdf.add_page()
+                    for line in f:
+                        pdf.set_font("Arial", size=12)
+                        pdf.cell(0, 10, line.strip(), ln=True)
+            elif file.endswith((".jpg", ".png")):
+                pdf.add_page()
+                pdf.image(file, x=10, y=10, w=190)
+        pdf.output(output_pdf)
+        print(f"PDF created: {output_pdf}")
+    except Exception as e:
+        print(f"Error creating PDF: {str(e)}")
+
+def send_email(sender_email, sender_password, recipient_email, subject, message):
+    """Sends an email with the specified content."""
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = recipient_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(message, 'plain'))
+        server.sendmail(sender_email, recipient_email, msg.as_string())
+        server.quit()
+        print("Email sent successfully.")
+    except Exception as e:
+        print(f"Error sending email: {str(e)}")
+
+def open_website(url):
+    """Opens a website in the default browser."""
+    webbrowser.open(url)
+    print(f"Opened website: {url}")
+
+def shutdown_computer():
+    """Shuts down the computer."""
+    try:
+        if os.name == 'nt':  # For Windows
+            subprocess.run(["shutdown", "/s", "/f", "/t", "1"])
+        elif os.name == 'posix':  # For macOS or Linux
+            subprocess.run(["shutdown", "-h", "now"])
+        print("Computer is shutting down...")
+    except Exception as e:
+        print(f"Error shutting down: {str(e)}")
+
+def restart_computer():
+    """Restarts the computer."""
+    try:
+        if os.name == 'nt':  # For Windows
+            subprocess.run(["shutdown", "/r", "/f", "/t", "1"])
+        elif os.name == 'posix':  # For macOS or Linux
+            subprocess.run(["shutdown", "-r", "now"])
+        print("Computer is restarting...")
+    except Exception as e:
+        print(f"Error restarting: {str(e)}")
+
+def take_screenshot(save_path):
+    """Takes a screenshot and saves it to the specified path."""
+    try:
+        screenshot = Image.grab()
+        screenshot.save(save_path)
+        print(f"Screenshot saved to {save_path}.")
+    except Exception as e:
+        print(f"Error taking screenshot: {str(e)}")
+
+def create_folder(folder_name):
+    """Creates a new folder with the specified name."""
+    try:
+        os.makedirs(folder_name, exist_ok=True)
+        print(f"Folder created: {folder_name}")
+    except Exception as e:
+        print(f"Error creating folder: {str(e)}")
+
+def delete_folder(folder_name):
+    """Deletes the specified folder."""
+    try:
+        shutil.rmtree(folder_name)
+        print(f"Folder deleted: {folder_name}")
+    except Exception as e:
+        print(f"Error deleting folder: {str(e)}")
+
+def open_task_manager():
+    """Opens Task Manager without requiring elevated privileges."""
+    try:
+        subprocess.run("taskmgr", shell=True)
+        print("Task Manager opened successfully.")
+    except Exception as e:
+        print(f"Error opening task manager: {str(e)}")
+
+def install_package(package_name):
+    """Installs a Python package."""
+    try:
+        subprocess.run(["pip", "install", package_name])
+        print(f"Package {package_name} installed successfully.")
+    except Exception as e:
+        print(f"Error installing package: {str(e)}")
+
+def open_file_with_default_application(file_path):
+    """Opens a file with the default application."""
+    try:
+        subprocess.run(["open", file_path]) if os.name == 'posix' else subprocess.run([file_path])
+        print(f"Opened file: {file_path}")
+    except Exception as e:
+        print(f"Error opening file: {str(e)}")
+
+def uninstall_package(package_name):
+    """Uninstalls a Python package."""
+    try:
+        subprocess.run(["pip", "uninstall", "-y", package_name])
+        print(f"Package {package_name} uninstalled successfully.")
+    except Exception as e:
+        print(f"Error uninstalling package: {str(e)}")
+def create_and_write_file(content):
+    """Creates a text file in the current directory and writes the provided content to it."""
+    try:
+        # Open the file in write mode ('w'). This will create the file in the current directory.
+        with open('output.txt', 'w') as file:
+            file.write(content)
+        
+        print("File created and content written.")
+    except Exception as e:
+        print(f"Error creating or writing to the file: {str(e)}")
+# Command-line interface
+# Command-line interface
 if __name__ == "__main__":
-    VoiceChatBot().run()
+    parser = argparse.ArgumentParser(description="Perform various PC tasks.")
+    parser.add_argument("--action", help="The action to perform", required=True)
+    parser.add_argument("--src_folder", help="Source folder path")
+    parser.add_argument("--dest_folder", help="Destination folder path")
+    parser.add_argument("--file_extension", help="File extension to filter (e.g., .txt, .jpg)")
+    parser.add_argument("--query", help="Search query for Google")
+    parser.add_argument("--url", help="YouTube video URL or website URL")
+    parser.add_argument("--save_path", help="Path to save downloaded video or file")
+    parser.add_argument("--folder_path", help="Folder path for renaming or zipping")
+    parser.add_argument("--prefix", help="Prefix for renaming files")
+    parser.add_argument("--zip_name", help="Name for the zip file")
+    parser.add_argument("--files", help="Comma-separated list of files to convert to PDF")
+    parser.add_argument("--sender_email", help="Sender email for sending email")
+    parser.add_argument("--sender_password", help="Sender email password")
+    parser.add_argument("--recipient_email", help="Recipient email address")
+    parser.add_argument("--subject", help="Subject of the email")
+    parser.add_argument("--message", help="Message body of the email")
+    parser.add_argument("--folder_name", help="Folder name to create or delete")
+    parser.add_argument("--file_path", help="File path to open with default application")
+    parser.add_argument("--package_name", help="Package name to install/uninstall")
+    parser.add_argument("--content", help="Content to write in the text file")
+
+    args = parser.parse_args()
+
+    # Execute actions based on the arguments provided
+    if args.action == "move_files_by_type":
+        move_files_by_type(args.src_folder, args.dest_folder, args.file_extension)
+    elif args.action == "organize_desktop":
+        organize_desktop()
+    elif args.action == "search_google":
+        search_google(args.query)
+    elif args.action == "download_youtube_video":
+        download_youtube_video(args.url, args.save_path)
+    elif args.action == "batch_rename_files":
+        batch_rename_files(args.folder_path, args.prefix)
+    elif args.action == "zip_folder":
+        zip_folder(args.folder_path, args.zip_name)
+    elif args.action == "extract_zip":
+        extract_zip(args.zip_name, args.dest_folder)
+    elif args.action == "convert_to_pdf":
+        convert_to_pdf(args.files, args.save_path)
+    elif args.action == "send_email":
+        send_email(args.sender_email, args.sender_password, args.recipient_email, args.subject, args.message)
+    elif args.action == "open_website":
+        open_website(args.url)
+    elif args.action == "shutdown_computer":
+        shutdown_computer()
+    elif args.action == "restart_computer":
+        restart_computer()
+    elif args.action == "take_screenshot":
+        take_screenshot(args.save_path)
+    elif args.action == "create_folder":
+        create_folder(args.folder_name)
+    elif args.action == "delete_folder":
+        delete_folder(args.folder_name)
+    elif args.action == "open_task_manager":
+        open_task_manager()
+    elif args.action == "install_package":
+        install_package(args.package_name)
+    elif args.action == "open_file_with_default_application":
+        open_file_with_default_application(args.file_path)
+    elif args.action == "uninstall_package":
+        uninstall_package(args.package_name)
+    elif args.action == "create_and_write_file":
+        create_and_write_file(args.content)
+    else:
+        print(f"Unknown action: {args.action}")

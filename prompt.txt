@@ -1,1 +1,1 @@
-FINAL PROMPT: Search for "Osama Elzero" on YouTube, limiting results to videos only.
+FINAL PROMPT: Open youtube and then open linkedin in network tab.
