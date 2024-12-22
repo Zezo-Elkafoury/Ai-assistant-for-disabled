@@ -220,7 +220,7 @@ def create_and_write_file(content):
         print("File created and content written.")
     except Exception as e:
         print(f"Error creating or writing to the file: {str(e)}")
-# Command-line interface
+
 # Command-line interface
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Perform various PC tasks.")

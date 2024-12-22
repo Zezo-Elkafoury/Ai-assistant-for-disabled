@@ -1,0 +1,6 @@
+beautifulsoup4
+newspaper3k
+transformers
+requests
+oauth2client
+gspread

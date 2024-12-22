@@ -1,1 +1,1 @@
-FINAL PROMPT: Open youtube and then open linkedin in network tab.
+FINAL PROMPT: Create a multi-step workflow to automate the collection of Python programming articles from top tech blogs, summarize them, format them into an email, save the summaries and email draft to a Google Sheet, and notify the user when complete with a downloadable link.

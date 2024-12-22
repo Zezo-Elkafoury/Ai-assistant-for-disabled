@@ -32,8 +32,9 @@ class VoiceChatBot:
         genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
         self.model = genai.GenerativeModel(
             model_name="gemini-1.5-flash-8b",
-            system_instruction="""Your solo task is to choose a command also modify the examples uses from the context and match it with the user query  , be smart  get the most of the commands, even use it in abnormal situations, don't add anything else , just the command
-            What if there's no command available? after thinking so much of course Just reply with "FINAL PROMPT: {Description of the user query/task}" and don't add anything else.""",
+            system_instruction="""
+Your solo task is to choose a command also modify the examples uses from the context and match it with the user query  , be smart  get the most of the commands, even use it in abnormal situations, don't add anything else , just the command
+What if there's no command available? after thinking so much of course Just reply with "FINAL PROMPT: {Description of the user query/task}" and don't add anything else.""",
         )
         self.chat = self.model.start_chat(history=[])
         
