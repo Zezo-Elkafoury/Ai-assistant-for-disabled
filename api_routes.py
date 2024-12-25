@@ -9,6 +9,9 @@ import threading
 from time import sleep
 import speech_recognition as sr
 
+import typing_extensions as typing
+
+
 load_dotenv()
 
 app = FastAPI()
@@ -112,16 +115,27 @@ A JSON response structured as:
    ```
 """
 
+class RoutingDetails(typing.TypedDict):
+    Action: str
+    Details: typing.Optional[str]
+
+class RoutingResponse(typing.TypedDict):
+    Message: str
+    Routing: RoutingDetails
+
 @app.post("/router/")
 async def router(query: UserQuery):
-    """Route a user query and return response in JSON format."""
     model = genai.GenerativeModel(
         model_name="gemini-2.0-flash-exp",
         system_instruction=system_prompt
     )
+
     chat = model.start_chat(history=[])
-    response = chat.send_message(query.query)
-    return response.text
+    response = chat.send_message(query.query,
+        generation_config=genai.GenerationConfig(
+        response_mime_type="application/json", response_schema=RoutingResponse
+    ))
+    return response.to_dict()
 
 
 @app.post("/generate-embedding/")
