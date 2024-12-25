@@ -2,4 +2,5 @@ venv/
 .env
 prompt.txt
 top_websites.csv
-components/__pycache__/
+components/__pycache__
+__pycache__
