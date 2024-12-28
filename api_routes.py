@@ -29,7 +29,7 @@ app.add_middleware(
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_INDEX_NAME = "isef-project"
-
+PINECONE_NAME_SPACE = "task-commands"
 # Configure GenAI
 genai.configure(api_key=GOOGLE_API_KEY)
 
@@ -139,6 +139,54 @@ model = genai.GenerativeModel(
 
 chat = model.start_chat(history=[])
 
+# Functions
+def run_commands(self, command):
+    if command.startswith("```"):
+        command = command[3:-3]
+        os.system(command)
+    elif command.startswith("python"):
+        os.system(command)
+    else:
+        print("Unknown command")
+    
+
+def gemini_embed_text(text):
+        try:
+            result = genai.embed_content(
+                model="models/text-embedding-004",
+                content=text
+            )
+            return result['embedding']
+        except Exception as e:
+            print(f"Error generating embedding for text: {e}")
+            return None
+
+
+def process_query(self, query):
+    if not query:
+        return
+
+    query_embedding = gemini_embed_text(query)
+
+    results = pinecone_index.query(
+        vector=query_embedding,
+        top_k=5,
+        namespace=PINECONE_NAME_SPACE,
+        include_metadata=True
+    )
+
+    contexts = [item['metadata']['example'] for item in results.to_dict()['matches']]
+
+    message = "<CONTEXT>\n" + "\n\n-------\n\n".join(contexts[:10]) + "\n-------\n</CONTEXT>\n\n\n\nMY QUESTION:\n" + query
+
+    return message
+def get_llm_response(msg,system_prompt):
+
+    genai.configure(api_key=GOOGLE_API_KEY)
+    model = genai.GenerativeModel("gemini-1.5-flash",system_instruction=system_prompt)
+    response = model.generate_content(msg)
+    return response.text
+
 @app.post("/router/")
 async def router(query: UserQuery):
 
@@ -148,17 +196,10 @@ async def router(query: UserQuery):
     ))
     return response.text
 
+@app.post("/excute/")
+async def excute(command:str):
+    return {"Success": True}
 
-@app.post("/generate-embedding/")
-async def generate_embedding(request: EmbeddingRequest):
-    """Generate embeddings for the given text."""
-    try:
-        embedding = genai.embed_content(
-            model="models/text-embedding-004", content=request.text
-        )
-        return {"embedding": embedding["embedding"]}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/pinecone/search/")
