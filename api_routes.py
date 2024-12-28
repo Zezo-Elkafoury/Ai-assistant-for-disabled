@@ -8,7 +8,7 @@ import pyttsx3
 import threading
 from time import sleep
 import speech_recognition as sr
-
+from fastapi.middleware.cors import CORSMiddleware
 import typing_extensions as typing
 
 
@@ -16,6 +16,15 @@ load_dotenv()
 
 app = FastAPI()
 
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # List of allowed origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all headers
+)
 # Load environment variables
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
@@ -123,19 +132,21 @@ class RoutingResponse(typing.TypedDict):
     Message: str
     Routing: RoutingDetails
 
+model = genai.GenerativeModel(
+    model_name="gemini-2.0-flash-exp",
+    system_instruction=system_prompt
+)
+
+chat = model.start_chat(history=[])
+
 @app.post("/router/")
 async def router(query: UserQuery):
-    model = genai.GenerativeModel(
-        model_name="gemini-2.0-flash-exp",
-        system_instruction=system_prompt
-    )
 
-    chat = model.start_chat(history=[])
     response = chat.send_message(query.query,
         generation_config=genai.GenerationConfig(
         response_mime_type="application/json", response_schema=RoutingResponse
     ))
-    return response.to_dict()
+    return response.text
 
 
 @app.post("/generate-embedding/")
