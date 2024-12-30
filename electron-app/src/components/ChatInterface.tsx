@@ -93,8 +93,50 @@ export default function Home() {
     }
   };
 
-  const handleMic = () => {
+  const handleMic = async () => {
     setIsRecording(!isRecording);
+    try{
+      const stt = await fetch("http://127.0.0.1:8000/speech-to-text/")
+      try {
+        const response = await fetch("http://127.0.0.1:8000/router/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            "query": stt
+          }),
+        });
+  
+        const data = await response.json();
+        const parsedData = JSON.parse(data);
+        const aiMessage = { role: "ai" as const, content: parsedData.Message };
+        setMessages(prev => [...prev, aiMessage]);
+        await fetch(`http://127.0.0.1:8000/text-to-speech/?text=${parsedData.Message}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+  
+        await fetch("http://127.0.0.1:8000/excute/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ command: parsedData.Routing.Details }),
+        });
+      } catch (error) {
+        console.error("Error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+     catch (error){
+      console.log(error)
+    } finally {
+      setIsRecording(!isRecording)
+    }
   };
 
   return (
