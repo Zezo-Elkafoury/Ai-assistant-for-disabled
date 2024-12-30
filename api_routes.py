@@ -140,7 +140,7 @@ model = genai.GenerativeModel(
 chat = model.start_chat(history=[])
 
 # Functions
-def run_commands(self, command):
+def run_commands(command):
     if command.startswith("```"):
         command = command[3:-3]
         os.system(command)
@@ -162,7 +162,7 @@ def gemini_embed_text(text):
             return None
 
 
-def process_query(self, query):
+def process_query(query):
     if not query:
         return
 
@@ -196,8 +196,26 @@ async def router(query: UserQuery):
     ))
     return response.text
 
+class CommandRequest(BaseModel):
+    command: str
+
 @app.post("/excute/")
-async def excute(command:str):
+async def excute(request :CommandRequest):
+    if request.command != "NULL/Other":
+        prompt = process_query(request.command)
+        response = get_llm_response(prompt,
+        """Your solo task is to choose a command also modify the examples uses from the context and match it with the user query  , be smart  get the most of the commands, even use it in abnormal situations, don't add anything else , just the command
+    What if there's no command available? after thinking so much of course Just reply with "FINAL PROMPT: {Description of the user query/task}" and don't add anything else.""",
+            )
+        if "python" in response:
+            run_commands(response)
+        elif "FINAL PROMPT" in response:
+            with open('prompt.txt', 'w+') as f:
+                f.write(response)
+            sleep(1)
+            os.system("python3 components/gen_code.py")
+        
+    
     return {"Success": True}
 
 
