@@ -10,7 +10,7 @@ This project is an AI-powered task assistant designed to enhance accessibility a
 - **Python** for backend logic and automation
 - **RAG (Retrieval-Augmented Generation)** for intelligent task execution
 - **Speech Recognition** for voice commands
-- **OpenAI GPT (or Gemini LLM)** for natural language understanding
+- **Gemini LLM** for natural language understanding
 
 ### Installation
 1. Clone the repository:
