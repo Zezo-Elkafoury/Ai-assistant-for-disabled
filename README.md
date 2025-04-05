@@ -17,15 +17,11 @@ This project is an AI-powered task assistant designed to enhance accessibility a
    ```bash
    git clone https://github.com/your-username/ai-task-assistant.git
    ```
-2. Navigate to the project folder:
-   ```bash
-   cd ai-task-assistant
-   ```
-3. Install the required dependencies:
+2. Install the required dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-4. Run the assistant:
+3. Run the assistant:
    ```bash
    python main.py
    ```
