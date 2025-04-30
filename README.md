@@ -11,20 +11,8 @@ This project is an AI-powered task assistant designed to enhance accessibility a
 - **RAG (Retrieval-Augmented Generation)** for intelligent task execution
 - **Speech Recognition** for voice commands
 - **Gemini LLM** for natural language understanding
+- **Electron.js** for Frontend and UI
 
-### Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/ai-task-assistant.git
-   ```
-2. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Run the assistant:
-   ```bash
-   python main.py
-   ```
 
 ### Usage
 1. Launch the assistant.
@@ -40,7 +28,3 @@ Contributions are welcome! If you'd like to improve the assistant or add new fea
 
 ### License
 This project is licensed under the MIT License.
-
-### Contact
-For inquiries or feedback, please contact [Your Name] at [Your Email].
-
